@@ -91,7 +91,7 @@ void LocalMapping::Run()
             // Safe area to stop
             while(isStopped() && !CheckFinish())
             {
-                usleep(3000);
+                std::this_thread::sleep_for(std::chrono::microseconds(3000));
             }
             if(CheckFinish())
                 break;
@@ -105,7 +105,7 @@ void LocalMapping::Run()
         if(CheckFinish())
             break;
 
-        usleep(3000);
+        std::this_thread::sleep_for(std::chrono::microseconds(3000));
     }
 
     SetFinish();
@@ -477,7 +477,8 @@ void LocalMapping::SearchInNeighbors()
             vpTargetKFs.push_back(pKFi2);
         }
     }
-
+    sort(vpTargetKFs.begin(), vpTargetKFs.end());
+    vpTargetKFs.erase(unique(vpTargetKFs.begin(), vpTargetKFs.end()), vpTargetKFs.end());
 
     // Search matches by projection from current KF in target KFs
     ORBmatcher matcher;
@@ -709,14 +710,14 @@ void LocalMapping::RequestReset()
         mbResetRequested = true;
     }
 
-    while(1)
+    while(!isStopped())
     {
         {
             unique_lock<mutex> lock2(mMutexReset);
             if(!mbResetRequested)
                 break;
         }
-        usleep(3000);
+        std::this_thread::sleep_for(std::chrono::microseconds(3000));
     }
 }
 
