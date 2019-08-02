@@ -23,3 +23,5 @@ build/
 lib/
 cmake-build-debug/
 .idea/
+/Vocabulary/ORBvoc.bin
+/Vocabulary/bin_vocabulary
