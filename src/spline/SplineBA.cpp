@@ -74,7 +74,7 @@ spline::SplineBA::SplineBA(std::vector<KeyFrame *> &vpKF, const std::vector<MapP
     std::vector<double> splineInlierRate;
     optimize(vpKF, vpMP, true, splineInlierRate, bRobust);
 
-    // TODO: is it reasonable to run opt several times? any other choice?
+    /*// TODO: is it reasonable to run opt several times? any other choice?
     for (int counter = 0; counter < 5; counter++) {// 5 iteration at most
         if (std::accumulate(splineInlierRate.begin(), splineInlierRate.end(), 0.0) / splineInlierRate.size() < 0.5) {
             // reinitialization
@@ -96,7 +96,7 @@ spline::SplineBA::SplineBA(std::vector<KeyFrame *> &vpKF, const std::vector<MapP
             traj.refineKnotVect(Xv);
             optimize(vpKF, vpMP, false, splineInlierRate, bRobust);
         }
-    }
+    }*/
 
     // Store opt result
     for (auto &it: vpKF) { // keyframe
@@ -113,7 +113,16 @@ spline::SplineBA::SplineBA(std::vector<KeyFrame *> &vpKF, const std::vector<MapP
         Tcw.block<3, 3>(0, 0) = Rcb * Rbw;
         Tcw.block<3, 1>(0, 3) = Rcb * tbw + tcb;
 
-        cv::eigen2cv(Tcw, it->mTcwGBA);
+        Eigen::Matrix4f Tcwf = Tcw.cast<float>();
+        cv::eigen2cv(Tcwf, it->mTcwGBA);
+    }
+
+    for (size_t i = 0; i < vpMP.size(); i++) {
+        MapPoint *pMP = vpMP[i];
+        if (pMP->isBad())
+            continue;
+
+        pMP->mPosGBA.convertTo(pMP->mPosGBA, CV_32F);
     }
 }
 
@@ -133,19 +142,19 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
     tcb << 0, 0, 0;
 
     // spline derivatives
-    std::unordered_map<unsigned long, std::shared_ptr<Eigen::Matrix<double, 2, 4>>> ders_ptrs;
+    std::unordered_map<unsigned long, Eigen::Matrix<double, 2, 4>, hash<unsigned long>, std::equal_to<unsigned long>, Eigen::aligned_allocator<std::allocator<std::pair<const unsigned long, Eigen::Matrix<double, 2, 4>>>>> ders_ptrs;
     std::unordered_map<unsigned long, size_t> spanIdxs;
     for (auto &it: vpKF) {
-        if (it->isBad() || it->mnId > vpKF.back()->mnId)
+        if (it->isBad())
             continue;
 
         size_t spanIdx = traj.findSpan(it->mTimeStamp);
         std::vector<std::vector<double>> ders;
         traj.dersBasisFuns(it->mTimeStamp, spanIdx, 1, ders);
-        auto ders_ptr = std::make_shared<Eigen::Matrix<double, 2, 4>>();
+        Eigen::Matrix<double, 2, 4> ders_ptr;
         for (int i = 0; i < 2; ++i) {
             for (int j = 0; j < 4; ++j) {
-                (*ders_ptr)(i, j) = ders[i][j];
+                ders_ptr(i, j) = ders[i][j];
             }
         }
         ders_ptrs[it->mnId] = ders_ptr;
@@ -263,7 +272,7 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
     /*** solve ***/
     options.linear_solver_ordering.reset(ordering);
     // TODO: still suitable for SCHUR trick? if not, use SPARSE_NORMAL_CHOLESKY
-    options.linear_solver_type = ceres::SPARSE_SCHUR; // dense schur for 100 cameras
+    options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY; // dense schur for 100 cameras
     options.minimizer_progress_to_stdout = true;
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
@@ -282,7 +291,7 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
         std::vector<double> singleFrameResiduals;
         problem.Evaluate(evaluateOptions, nullptr, &singleFrameResiduals, nullptr, nullptr);
         splineInlierRate.push_back(std::count_if(singleFrameResiduals.begin(), singleFrameResiduals.end(),
-                                                 [&](double &x) { return x < inlierThreshold; })
+                                                 [&](double &x) { return std::abs(x) < inlierThreshold; })
                                    / double(singleFrameResiduals.size()));
     }
 

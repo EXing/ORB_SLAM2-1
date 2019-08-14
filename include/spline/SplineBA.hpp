@@ -37,7 +37,7 @@ namespace spline { // Default: Assume car front is $z$-axis
     protected:
         spline::Bspline<3> traj;
         std::vector<double> rotAngle;
-        std::unordered_map<unsigned long, size_t> KFidLook;
+        std::unordered_map<unsigned long, int> KFidLook;
     };
 
     /*** template fucntion for ceres ***/
@@ -79,7 +79,7 @@ namespace spline { // Default: Assume car front is $z$-axis
     struct SplineMonoReprojectionError {
         SplineMonoReprojectionError(const Eigen::Vector2d &obs, const Eigen::Matrix3d &Rcb, const Eigen::Vector3d &tcb,
                                     double fx, double fy, double cx, double cy,
-                                    std::shared_ptr<Eigen::Matrix<double, 2, 4>> dersTraj)
+                                    Eigen::Matrix<double, 2, 4> &dersTraj)
                 : obs(obs), Rcb(Rcb), tcb(tcb), dersTraj(dersTraj), fx(fx), fy(fy), cx(cx), cy(cy) {}
 
         template<typename T>
@@ -87,20 +87,20 @@ namespace spline { // Default: Assume car front is $z$-axis
                         const T *const rotAng, const T *const lm,
                         T *residuals) const {
             const T twb[3] = {
-                    T((*dersTraj)(0, 0)) * cp0[0] + T((*dersTraj)(0, 1)) * cp1[0] + T((*dersTraj)(0, 2)) * cp2[0] +
-                    T((*dersTraj)(0, 3)) * cp3[0],
-                    T((*dersTraj)(0, 0)) * cp0[1] + T((*dersTraj)(0, 1)) * cp1[1] + T((*dersTraj)(0, 2)) * cp2[1] +
-                    T((*dersTraj)(0, 3)) * cp3[1],
-                    T((*dersTraj)(0, 0)) * cp0[2] + T((*dersTraj)(0, 1)) * cp1[2] + T((*dersTraj)(0, 2)) * cp2[2] +
-                    T((*dersTraj)(0, 3)) * cp3[2]};
+                    T(dersTraj(0, 0)) * cp0[0] + T(dersTraj(0, 1)) * cp1[0] + T(dersTraj(0, 2)) * cp2[0] +
+                    T(dersTraj(0, 3)) * cp3[0],
+                    T(dersTraj(0, 0)) * cp0[1] + T(dersTraj(0, 1)) * cp1[1] + T(dersTraj(0, 2)) * cp2[1] +
+                    T(dersTraj(0, 3)) * cp3[1],
+                    T(dersTraj(0, 0)) * cp0[2] + T(dersTraj(0, 1)) * cp1[2] + T(dersTraj(0, 2)) * cp2[2] +
+                    T(dersTraj(0, 3)) * cp3[2]};
 
             T y[3] = {
-                    T((*dersTraj)(1, 0)) * cp0[0] + T((*dersTraj)(1, 1)) * cp1[0] + T((*dersTraj)(1, 2)) * cp2[0] +
-                    T((*dersTraj)(1, 3)) * cp3[0],
-                    T((*dersTraj)(1, 0)) * cp0[1] + T((*dersTraj)(1, 1)) * cp1[1] + T((*dersTraj)(1, 2)) * cp2[1] +
-                    T((*dersTraj)(1, 3)) * cp3[1],
-                    T((*dersTraj)(1, 0)) * cp0[2] + T((*dersTraj)(1, 1)) * cp1[2] + T((*dersTraj)(1, 2)) * cp2[2] +
-                    T((*dersTraj)(1, 3)) * cp3[2]};
+                    T(dersTraj(1, 0)) * cp0[0] + T(dersTraj(1, 1)) * cp1[0] + T(dersTraj(1, 2)) * cp2[0] +
+                    T(dersTraj(1, 3)) * cp3[0],
+                    T(dersTraj(1, 0)) * cp0[1] + T(dersTraj(1, 1)) * cp1[1] + T(dersTraj(1, 2)) * cp2[1] +
+                    T(dersTraj(1, 3)) * cp3[1],
+                    T(dersTraj(1, 0)) * cp0[2] + T(dersTraj(1, 1)) * cp1[2] + T(dersTraj(1, 2)) * cp2[2] +
+                    T(dersTraj(1, 3)) * cp3[2]};
             const T scale = T(1) / ceres::sqrt(y[0] * y[0] + y[1] * y[1] + y[2] * y[2]);
             y[0] *= scale;
             y[1] *= scale;
@@ -138,7 +138,7 @@ namespace spline { // Default: Assume car front is $z$-axis
 
         static ceres::CostFunction *
         Create(const Eigen::Vector2d &obs, const Eigen::Matrix3d &Rcb, const Eigen::Vector3d &tcb, double fx, double fy,
-               double cx, double cy, std::shared_ptr<Eigen::Matrix<double, 2, 4>> dersTraj) {
+               double cx, double cy, Eigen::Matrix<double, 2, 4> &dersTraj) {
             return (new ceres::AutoDiffCostFunction<SplineMonoReprojectionError, 2, 3, 3, 3, 3, 1, 3>(
                     new SplineMonoReprojectionError(obs, Rcb, tcb, fx, fy, cx, cy, dersTraj)));
         }
@@ -149,14 +149,14 @@ namespace spline { // Default: Assume car front is $z$-axis
         double fx, fy, cx, cy;
 
         // for spline evaluation
-        std::shared_ptr<Eigen::Matrix<double, 2, 4>> dersTraj;
+        Eigen::Matrix<double, 2, 4> dersTraj;
     };
 
     struct SplineStereoReprojectionError {
         SplineStereoReprojectionError(const Eigen::Vector3d &obs, const Eigen::Matrix3d &Rcb,
                                       const Eigen::Vector3d &tcb,
                                       double fx, double fy, double cx, double cy, double bf,
-                                      std::shared_ptr<Eigen::Matrix<double, 2, 4>> dersTraj)
+                                      Eigen::Matrix<double, 2, 4> &dersTraj)
                 : obs(obs), Rcb(Rcb), tcb(tcb), dersTraj(dersTraj), fx(fx), fy(fy), cx(cx), cy(cy), bf(bf) {}
 
         template<typename T>
@@ -164,20 +164,20 @@ namespace spline { // Default: Assume car front is $z$-axis
                         const T *const rotAng, const T *const lm,
                         T *residuals) const {
             const T twb[3] = {
-                    T((*dersTraj)(0, 0)) * cp0[0] + T((*dersTraj)(0, 1)) * cp1[0] + T((*dersTraj)(0, 2)) * cp2[0] +
-                    T((*dersTraj)(0, 3)) * cp3[0],
-                    T((*dersTraj)(0, 0)) * cp0[1] + T((*dersTraj)(0, 1)) * cp1[1] + T((*dersTraj)(0, 2)) * cp2[1] +
-                    T((*dersTraj)(0, 3)) * cp3[1],
-                    T((*dersTraj)(0, 0)) * cp0[2] + T((*dersTraj)(0, 1)) * cp1[2] + T((*dersTraj)(0, 2)) * cp2[2] +
-                    T((*dersTraj)(0, 3)) * cp3[2]};
+                    T(dersTraj(0, 0)) * cp0[0] + T(dersTraj(0, 1)) * cp1[0] + T(dersTraj(0, 2)) * cp2[0] +
+                    T(dersTraj(0, 3)) * cp3[0],
+                    T(dersTraj(0, 0)) * cp0[1] + T(dersTraj(0, 1)) * cp1[1] + T(dersTraj(0, 2)) * cp2[1] +
+                    T(dersTraj(0, 3)) * cp3[1],
+                    T(dersTraj(0, 0)) * cp0[2] + T(dersTraj(0, 1)) * cp1[2] + T(dersTraj(0, 2)) * cp2[2] +
+                    T(dersTraj(0, 3)) * cp3[2]};
 
             T y[3] = {
-                    T((*dersTraj)(1, 0)) * cp0[0] + T((*dersTraj)(1, 1)) * cp1[0] + T((*dersTraj)(1, 2)) * cp2[0] +
-                    T((*dersTraj)(1, 3)) * cp3[0],
-                    T((*dersTraj)(1, 0)) * cp0[1] + T((*dersTraj)(1, 1)) * cp1[1] + T((*dersTraj)(1, 2)) * cp2[1] +
-                    T((*dersTraj)(1, 3)) * cp3[1],
-                    T((*dersTraj)(1, 0)) * cp0[2] + T((*dersTraj)(1, 1)) * cp1[2] + T((*dersTraj)(1, 2)) * cp2[2] +
-                    T((*dersTraj)(1, 3)) * cp3[2]};
+                    T(dersTraj(1, 0)) * cp0[0] + T(dersTraj(1, 1)) * cp1[0] + T(dersTraj(1, 2)) * cp2[0] +
+                    T(dersTraj(1, 3)) * cp3[0],
+                    T(dersTraj(1, 0)) * cp0[1] + T(dersTraj(1, 1)) * cp1[1] + T(dersTraj(1, 2)) * cp2[1] +
+                    T(dersTraj(1, 3)) * cp3[1],
+                    T(dersTraj(1, 0)) * cp0[2] + T(dersTraj(1, 1)) * cp1[2] + T(dersTraj(1, 2)) * cp2[2] +
+                    T(dersTraj(1, 3)) * cp3[2]};
             const T scale = T(1) / ceres::sqrt(y[0] * y[0] + y[1] * y[1] + y[2] * y[2]);
             y[0] *= scale;
             y[1] *= scale;
@@ -218,7 +218,7 @@ namespace spline { // Default: Assume car front is $z$-axis
 
         static ceres::CostFunction *
         Create(const Eigen::Vector3d &obs, const Eigen::Matrix3d &Rcb, const Eigen::Vector3d &tcb, double fx, double fy,
-               double cx, double cy, double bf, std::shared_ptr<Eigen::Matrix<double, 2, 4>> dersTraj) {
+               double cx, double cy, double bf, Eigen::Matrix<double, 2, 4> &dersTraj) {
             return (new ceres::AutoDiffCostFunction<SplineStereoReprojectionError, 3, 3, 3, 3, 3, 1, 3>(
                     new SplineStereoReprojectionError(obs, Rcb, tcb, fx, fy, cx, cy, bf, dersTraj)));
         }
@@ -229,7 +229,7 @@ namespace spline { // Default: Assume car front is $z$-axis
         double fx, fy, cx, cy, bf;
 
         // for spline evaluation
-        std::shared_ptr<Eigen::Matrix<double, 2, 4>> dersTraj;
+        Eigen::Matrix<double, 2, 4> dersTraj;
     };
 
     struct RotConsistencyError {

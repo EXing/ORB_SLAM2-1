@@ -23,6 +23,7 @@
 
 #include<opencv2/core/core.hpp>
 #include<opencv2/features2d/features2d.hpp>
+#include<opencv2/core/eigen.hpp>
 
 #include"ORBmatcher.h"
 #include"FrameDrawer.h"
@@ -511,8 +512,15 @@ void Tracking::StereoInitialization()
 {
     if(mCurrentFrame.N>500)
     {
-        // Set Frame pose to the origin
-        mCurrentFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
+        // Set Frame pose to the origin // huangkun: set to car pose for assumption
+        Eigen::Matrix4f eigenT1w;
+        eigenT1w << 1, 0, 0,0,
+                0, 0, -1, 0,
+                0, 1, 0, 0,
+                0, 0, 0, 0;
+        cv::Mat cvT1w;
+        cv::eigen2cv(eigenT1w, cvT1w);
+        mCurrentFrame.SetPose(cvT1w);
 
         // Create KeyFrame
         KeyFrame* pKFini = new KeyFrame(mCurrentFrame,mpMap,mpKeyFrameDB);
@@ -624,11 +632,24 @@ void Tracking::MonocularInitialization()
             }
 
             // Set Frame Poses
-            mInitialFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
-            cv::Mat Tcw = cv::Mat::eye(4,4,CV_32F);
-            Rcw.copyTo(Tcw.rowRange(0,3).colRange(0,3));
-            tcw.copyTo(Tcw.rowRange(0,3).col(3));
-            mCurrentFrame.SetPose(Tcw);
+            Eigen::Matrix4f eigenT1w;
+            eigenT1w << 1, 0, 0,0,
+                        0, 0, -1, 0,
+                        0, 1, 0, 0,
+                        0, 0, 0, 0;
+            cv::Mat cvT1w;
+            cv::eigen2cv(eigenT1w, cvT1w);
+            mInitialFrame.SetPose(cvT1w);
+            cv::Mat T21 = cv::Mat::eye(4,4,CV_32F);
+            Rcw.copyTo(T21.rowRange(0,3).colRange(0,3));
+            tcw.copyTo(T21.rowRange(0,3).col(3));
+            Eigen::Matrix4f eigenT21;
+            cv::cv2eigen(T21, eigenT21);
+
+            cv::Mat T2w;
+            Eigen::Matrix4f eigenT2w = eigenT21*eigenT1w;
+            cv::eigen2cv(eigenT2w, T2w);
+            mCurrentFrame.SetPose(T2w);
 
             CreateInitialMapMonocular();
         }

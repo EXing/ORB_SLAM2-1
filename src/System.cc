@@ -287,16 +287,17 @@ namespace ORB_SLAM2 {
     void System::Shutdown() {
         // Call global BA here
         {
-            Optimizer::GlobalBundleAdjustemnt(mpMap);
-
-            cout << "Global Bundle Adjustment finished" << endl;
-            cout << "Updating map ..." << endl;
             mpLocalMapper->RequestStop();
             // Wait until Local Mapping has effectively stopped
 
             while (!mpLocalMapper->isStopped() && !mpLocalMapper->isFinished()) {
                 std::this_thread::sleep_for(std::chrono::microseconds(1000));
             }
+
+            Optimizer::GlobalBundleAdjustemnt(mpMap);
+
+            cout << "Global Bundle Adjustment finished" << endl;
+            cout << "Updating map ..." << endl;
 
             // Get Map Mutex
             unique_lock<mutex> lock(mpMap->mMutexMapUpdate);
@@ -329,7 +330,7 @@ namespace ORB_SLAM2 {
 
             cout << "Map updated!" << endl;
 
-            std::this_thread::sleep_for(std::chrono::microseconds(50000));
+            std::cin.ignore();
         }
 
         mpLocalMapper->RequestFinish();
