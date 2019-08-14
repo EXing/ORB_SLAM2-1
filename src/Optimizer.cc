@@ -34,6 +34,8 @@
 
 #include<mutex>
 
+#include <spline/SplineBA.hpp>
+
 namespace ORB_SLAM2
 {
 
@@ -42,7 +44,10 @@ void Optimizer::GlobalBundleAdjustemnt(Map* pMap, int nIterations, bool* pbStopF
 {
     vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
     vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
-    BundleAdjustment(vpKFs,vpMP,nIterations,pbStopFlag, nLoopKF, bRobust);
+
+    // TODO: code here, 2 case: 1st, initialization(nLoopKF==0); 2nd, global BA in the end;
+    spline::SplineBA(vpKFs,vpMP,bRobust);
+    //BundleAdjustment(vpKFs,vpMP,nIterations,pbStopFlag, nLoopKF, bRobust);
 }
 
 
@@ -198,11 +203,11 @@ void Optimizer::BundleAdjustment(const vector<KeyFrame *> &vpKFs, const vector<M
         g2o::VertexSE3Expmap* vSE3 = static_cast<g2o::VertexSE3Expmap*>(optimizer.vertex(pKF->mnId));
         g2o::SE3Quat SE3quat = vSE3->estimate();
         if(nLoopKF==0)
-        {
+        {// for initialization
             pKF->SetPose(Converter::toCvMat(SE3quat));
         }
         else
-        {
+        {// for loop closing
             pKF->mTcwGBA.create(4,4,CV_32F);
             Converter::toCvMat(SE3quat).copyTo(pKF->mTcwGBA);
             pKF->mnBAGlobalForKF = nLoopKF;

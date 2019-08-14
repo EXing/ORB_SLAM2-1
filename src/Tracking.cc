@@ -684,7 +684,8 @@ void Tracking::CreateInitialMapMonocular()
     // Bundle Adjustment
     cout << "New Map created with " << mpMap->MapPointsInMap() << " points" << endl;
 
-    Optimizer::GlobalBundleAdjustemnt(mpMap,20);
+    //Optimizer::GlobalBundleAdjustemnt(mpMap,20);
+    Optimizer::BundleAdjustment(mpMap->GetAllKeyFrames(),mpMap->GetAllMapPoints(),20);
 
     // Set median depth to 1
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);

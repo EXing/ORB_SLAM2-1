@@ -76,6 +76,7 @@ void LocalMapping::Run()
 
             if(!CheckNewKeyFrames() && !stopRequested())
             {
+                // TODO: test remove localBA
                 // Local BA
                 if(mpMap->KeyFramesInMap()>2)
                     Optimizer::LocalBundleAdjustment(mpCurrentKeyFrame,&mbAbortBA, mpMap);
@@ -84,7 +85,7 @@ void LocalMapping::Run()
                 KeyFrameCulling();
             }
 
-            mpLoopCloser->InsertKeyFrame(mpCurrentKeyFrame);
+            //mpLoopCloser->InsertKeyFrame(mpCurrentKeyFrame); //disable loop closing
         }
         else if(Stop())
         {
