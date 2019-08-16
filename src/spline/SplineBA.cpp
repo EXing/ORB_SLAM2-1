@@ -135,6 +135,8 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
     auto *ordering = new ceres::ParameterBlockOrdering;
     std::unordered_map<unsigned long, std::vector<ceres::ResidualBlockId>> splineResidualBlocks;
 
+    std::vector<ceres::ResidualBlockId> reprojectionRes, rotConsistencyRes, rotPenaltyRes;
+
     // Rcb, tcb
     Eigen::Matrix3d Rcb;
     Eigen::Vector3d tcb;
@@ -162,8 +164,10 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
     }
 
     // SplineReprojectionError
-    const float thHuber2D = 5.99;
-    const float thHuber3D = 7.815;
+    const float thHuber2D = 6;
+    const float thHuber3D = 8;
+    ceres::LossFunction *loss_function_2d = new ceres::HuberLoss(thHuber2D);
+    ceres::LossFunction *loss_function_3d = new ceres::HuberLoss(thHuber3D);
     for (size_t i = 0; i < vpMP.size(); i++) {
         MapPoint *pMP = vpMP[i];
         if (pMP->isBad())
@@ -188,19 +192,15 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
                     pMP->GetWorldPos().convertTo(pMP->mPosGBA, CV_64F);
                 }
 
-                ceres::LossFunction *loss_function = nullptr;
-                if (bRobust) {
-                    loss_function = new ceres::HuberLoss(thHuber2D);
-                }
-
                 size_t spanIdx = spanIdxs[pKF->mnId];
-                splineResidualBlocks[pKF->mnId].push_back(
-                        problem.AddResidualBlock(cost_function, loss_function,
+                reprojectionRes.push_back(
+                        problem.AddResidualBlock(cost_function, bRobust ? loss_function_2d : nullptr,
                                                  traj.getCP()[spanIdx - 3 + 0].data(),
                                                  traj.getCP()[spanIdx - 3 + 1].data(),
                                                  traj.getCP()[spanIdx - 3 + 2].data(),
                                                  traj.getCP()[spanIdx - 3 + 3].data(),
                                                  rotAngle.data() + KFidLook[pKF->mnId], pMP->mPosGBA.ptr<double>()));
+                splineResidualBlocks[pKF->mnId].push_back(reprojectionRes.back());
 
                 // ordering, landmarks 1st
                 ordering->AddElementToGroup(pMP->mPosGBA.ptr<double>(), 0);
@@ -218,19 +218,15 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
                     pMP->GetWorldPos().convertTo(pMP->mPosGBA, CV_64F);
                 }
 
-                ceres::LossFunction *loss_function = nullptr;
-                if (bRobust) {
-                    loss_function = new ceres::HuberLoss(thHuber3D);
-                }
-
                 size_t spanIdx = spanIdxs[pKF->mnId];
-                splineResidualBlocks[pKF->mnId].push_back(
-                        problem.AddResidualBlock(cost_function, loss_function,
+                reprojectionRes.push_back(
+                        problem.AddResidualBlock(cost_function, bRobust ? loss_function_3d : nullptr,
                                                  traj.getCP()[spanIdx - 3 + 0].data(),
                                                  traj.getCP()[spanIdx - 3 + 1].data(),
                                                  traj.getCP()[spanIdx - 3 + 2].data(),
                                                  traj.getCP()[spanIdx - 3 + 3].data(),
                                                  rotAngle.data() + KFidLook[pKF->mnId], pMP->mPosGBA.ptr<double>()));
+                splineResidualBlocks[pKF->mnId].push_back(reprojectionRes.back());
 
                 // ordering, landmarks 1st
                 ordering->AddElementToGroup(pMP->mPosGBA.ptr<double>(), 0);
@@ -240,12 +236,14 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
 
     // RotConsistencyError
     for (size_t i = 1; i < rotAngle.size(); i++) {
-        problem.AddResidualBlock(RotConsistencyError::Create(), nullptr, rotAngle.data() + i, rotAngle.data() + i - 1);
+        rotConsistencyRes.push_back(
+                problem.AddResidualBlock(RotConsistencyError::Create(), nullptr, rotAngle.data() + i,
+                                         rotAngle.data() + i - 1));
     }
 
     for (size_t i = 0; i < rotAngle.size(); i++) {
         // RotPenalty
-        problem.AddResidualBlock(RotPenalty::Create(), nullptr, rotAngle.data() + i);
+        rotPenaltyRes.push_back(problem.AddResidualBlock(RotPenalty::Create(), nullptr, rotAngle.data() + i));
 
         // RotAng constrain
         problem.SetParameterLowerBound(rotAngle.data() + i, 0, -M_PI / 4);
@@ -253,6 +251,7 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
 
         // ordering, rotAngle 2nd
         ordering->AddElementToGroup(rotAngle.data() + i, 1);
+        problem.AddParameterBlock(rotAngle.data() + i, 1);// addtional check
     }
 
     // ordering, control points 3rd
@@ -272,11 +271,40 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
     problem.SetParameterBlockConstant(traj.getCP()[2].data());
     problem.SetParameterBlockConstant(traj.getCP()[3].data());
 
+    /*** error before opt ***/
+    ceres::Problem::EvaluateOptions evaluateOptions;
+    std::vector<double> residuals;
+
+    evaluateOptions.residual_blocks = reprojectionRes;
+    problem.Evaluate(evaluateOptions, nullptr, &residuals, nullptr, nullptr);
+    double repErrorBefore = 0;
+    for (auto &res: residuals) {
+        repErrorBefore += res * res;
+    }
+    residuals.clear();
+
+    evaluateOptions.residual_blocks = rotConsistencyRes;
+    problem.Evaluate(evaluateOptions, nullptr, &residuals, nullptr, nullptr);
+    double rotConsistencyErrorBefore = 0;
+    for (auto &res: residuals) {
+        rotConsistencyErrorBefore += res * res;
+    }
+    residuals.clear();
+
+    evaluateOptions.residual_blocks = rotPenaltyRes;
+    problem.Evaluate(evaluateOptions, nullptr, &residuals, nullptr, nullptr);
+    double rotPenaltyErrorBefore = 0;
+    for (auto &res: residuals) {
+        rotPenaltyErrorBefore += res * res;
+    }
+    residuals.clear();
+
     /*** solve ***/
     options.linear_solver_ordering.reset(ordering);
     options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
     options.minimizer_progress_to_stdout = true;
     options.num_threads = 3;
+    options.max_num_iterations = 20;
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
 
@@ -297,6 +325,40 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
                                                  [&](double &x) { return std::abs(x) < inlierThreshold; })
                                    / double(singleFrameResiduals.size()));
     }*/
+
+    /*** error after opt ***/
+    evaluateOptions.residual_blocks = reprojectionRes;
+    problem.Evaluate(evaluateOptions, nullptr, &residuals, nullptr, nullptr);
+    double repErrorAfter = 0;
+    for (auto &res: residuals) {
+        repErrorAfter += res * res;
+    }
+    residuals.clear();
+
+    evaluateOptions.residual_blocks = rotConsistencyRes;
+    problem.Evaluate(evaluateOptions, nullptr, &residuals, nullptr, nullptr);
+    double rotConsistencyErrorAfter = 0;
+    for (auto &res: residuals) {
+        rotConsistencyErrorAfter += res * res;
+    }
+    residuals.clear();
+
+    evaluateOptions.residual_blocks = rotPenaltyRes;
+    problem.Evaluate(evaluateOptions, nullptr, &residuals, nullptr, nullptr);
+    double rotPenaltyErrorAfter = 0;
+    for (auto &res: residuals) {
+        rotPenaltyErrorAfter += res * res;
+    }
+    residuals.clear();
+
+    std::cout << "Error before opt:" << std::endl
+              << "repError: " << repErrorBefore << std::endl
+              << "rotConsistencyError: " << rotConsistencyErrorBefore << std::endl
+              << "rotPenaltyError: " << rotPenaltyErrorBefore << std::endl
+              << "Error after opt:" << std::endl
+              << "repError: " << repErrorAfter << std::endl
+              << "rotConsistencyError: " << rotConsistencyErrorAfter << std::endl
+              << "rotPenaltyErrorError: " << rotPenaltyErrorAfter << std::endl;
 
     return 0;
 }

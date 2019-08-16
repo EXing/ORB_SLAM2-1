@@ -235,7 +235,7 @@ namespace spline { // Default: Assume car front is $z$-axis
     struct RotConsistencyError {
         template<typename T>
         bool operator()(const T *const rotAng0, const T *const rotAng1, T *residuals) const {
-            residuals[0] = rotAng0[0] - rotAng1[0];
+            residuals[0] = T(5e3)*(rotAng0[0] - rotAng1[0]);
             return true;
         }
 
@@ -248,7 +248,7 @@ namespace spline { // Default: Assume car front is $z$-axis
     struct RotPenalty {
         template<typename T>
         bool operator()(const T *const rotAng, T *residuals) const {
-            residuals[0] = rotAng[0];
+            residuals[0] = T(5e3)*(rotAng[0]);
             return true;
         }
 
