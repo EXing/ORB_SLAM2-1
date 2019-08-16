@@ -287,12 +287,15 @@ namespace ORB_SLAM2 {
     void System::Shutdown() {
         // Call global BA here
         {
-            mpLocalMapper->RequestStop();
             // Wait until Local Mapping has effectively stopped
-
+            std::this_thread::sleep_for(std::chrono::microseconds(5000));
+            mpLocalMapper->RequestStop();
             while (!mpLocalMapper->isStopped() && !mpLocalMapper->isFinished()) {
                 std::this_thread::sleep_for(std::chrono::microseconds(1000));
             }
+
+            // save trajectory before global BA
+            SaveTrajectoryKITTI("CameraTrajectoryBeforeBA.txt");
 
             Optimizer::GlobalBundleAdjustemnt(mpMap);
 

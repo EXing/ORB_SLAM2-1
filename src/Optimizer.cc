@@ -45,7 +45,6 @@ void Optimizer::GlobalBundleAdjustemnt(Map* pMap, int nIterations, bool* pbStopF
     vector<KeyFrame*> vpKFs = pMap->GetAllKeyFrames();
     vector<MapPoint*> vpMP = pMap->GetAllMapPoints();
 
-    // TODO: code here, 2 case: 1st, initialization(nLoopKF==0); 2nd, global BA in the end;
     spline::SplineBA(vpKFs,vpMP,bRobust);
     //BundleAdjustment(vpKFs,vpMP,nIterations,pbStopFlag, nLoopKF, bRobust);
 }

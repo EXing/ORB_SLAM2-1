@@ -263,6 +263,9 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
     // Fix 1st Control point
     problem.SetParameterBlockConstant(traj.getCP()[0].data());
 
+    // Fix 1st angle
+    problem.SetParameterBlockConstant(rotAngle.data());
+
     // Scale Consistency except buffer begin(TODO: windowBA)
     // Fix the first p+1 control points
     problem.SetParameterBlockConstant(traj.getCP()[1].data());
@@ -271,16 +274,16 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
 
     /*** solve ***/
     options.linear_solver_ordering.reset(ordering);
-    // TODO: still suitable for SCHUR trick? if not, use SPARSE_NORMAL_CHOLESKY
-    options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY; // dense schur for 100 cameras
+    options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
     options.minimizer_progress_to_stdout = true;
+    options.num_threads = 3;
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
 
     // Use FullReport() to diagnose performance problems
     std::cout << summary.FullReport() << "\n";
 
-    // count inliers
+    /*// count inliers
     splineInlierRate.clear();
     ceres::Problem::EvaluateOptions evaluateOptions;
     double inlierThreshold = 2 * 2; // TODO: Find a suitable inlierThreshold in sqrt pixel unit
@@ -293,7 +296,7 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
         splineInlierRate.push_back(std::count_if(singleFrameResiduals.begin(), singleFrameResiduals.end(),
                                                  [&](double &x) { return std::abs(x) < inlierThreshold; })
                                    / double(singleFrameResiduals.size()));
-    }
+    }*/
 
     return 0;
 }
