@@ -9,11 +9,13 @@
 
 inline void spline::SplineBA::rotMatrixToDer(const Eigen::Matrix3d &Rbw, Eigen::Vector3d &d, double &theta) {
     d = Rbw.row(1).transpose();
+
     Eigen::Vector3d n = d.cross(Eigen::Vector3d(0, 0, 1));
     n /= n.norm();
     Eigen::Vector3d z = n.cross(d);
 
-    theta = std::acos(Rbw.row(2) * z);// [0, pi]
+    double tmp = Rbw.row(2) * z;
+    theta = std::acos(tmp > 1.0 ? 1.0 : tmp);// [0, pi]
 
     if (std::acos(Rbw.row(2) * n) > M_PI / 2)
         theta = -theta;
@@ -25,9 +27,11 @@ inline void spline::SplineBA::derToRotMatrix(const Eigen::Vector3d &d, double th
     Eigen::Vector3d n = unit_d.cross(Eigen::Vector3d(0, 0, 1));
     n /= n.norm();
     Eigen::Vector3d z = n.cross(unit_d);
+    z /= z.norm();
 
     Rbw.row(2) = (std::cos(theta) * z + std::sin(theta) * n).transpose();
     Rbw.row(0) = Rbw.row(1).cross(Rbw.row(2)); // X = Y x Z
+    Rbw.row(0) /= Rbw.row(0).norm();
 }
 
 spline::SplineBA::SplineBA(std::vector<KeyFrame *> &vpKF, const std::vector<MapPoint *> &vpMP,
@@ -69,7 +73,7 @@ spline::SplineBA::SplineBA(std::vector<KeyFrame *> &vpKF, const std::vector<MapP
     std::vector<double> init_rotAngle(rotAngle);// backup
 
     // Approximation
-    traj = spline::Bspline<3>(3, Q, vpKF.size() / 3, u, dQ);
+    traj = spline::Bspline<3>(3, Q, vpKF.size() / 2, u, dQ);
 
     std::vector<double> splineInlierRate;
     optimize(vpKF, vpMP, true, splineInlierRate, bRobust);
@@ -123,6 +127,7 @@ spline::SplineBA::SplineBA(std::vector<KeyFrame *> &vpKF, const std::vector<MapP
             continue;
 
         pMP->mPosGBA.convertTo(pMP->mPosGBA, CV_32F);
+        //pMP->GetWorldPos().convertTo(pMP->mPosGBA, CV_32F);
     }
 }
 

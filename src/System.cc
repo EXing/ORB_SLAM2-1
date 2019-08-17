@@ -288,7 +288,7 @@ namespace ORB_SLAM2 {
         // Call global BA here
         {
             // Wait until Local Mapping has effectively stopped
-            std::this_thread::sleep_for(std::chrono::microseconds(5000));
+            std::this_thread::sleep_for(std::chrono::microseconds(2000));
             mpLocalMapper->RequestStop();
             while (!mpLocalMapper->isStopped() && !mpLocalMapper->isFinished()) {
                 std::this_thread::sleep_for(std::chrono::microseconds(1000));
@@ -323,7 +323,6 @@ namespace ORB_SLAM2 {
                     continue;
                 if (!pMP->mPosGBA.empty()) {
                     pMP->SetWorldPos(pMP->mPosGBA);
-                    pMP->UpdateNormalAndDepth();
                 }
             }
 
