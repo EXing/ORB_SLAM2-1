@@ -295,7 +295,11 @@ namespace ORB_SLAM2 {
             }
 
             // save trajectory before global BA
-            SaveTrajectoryKITTI("CameraTrajectoryBeforeBA.txt");
+            if (mSensor == MONOCULAR)
+                SaveKeyFrameTrajectoryTUM("CameraTrajectoryBeforeBA.txt");
+            else
+                SaveTrajectoryKITTI("CameraTrajectoryBeforeBA.txt");
+
 
             Optimizer::GlobalBundleAdjustemnt(mpMap);
 

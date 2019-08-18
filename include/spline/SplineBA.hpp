@@ -130,8 +130,8 @@ namespace spline { // Default: Assume car front is $z$-axis
             Xc[1] += T(tcb(1));
             Xc[2] += T(tcb(2));
 
-            residuals[0] = T(obs[0]) - Xc[0] / Xc[2] * T(fx) + T(cx);
-            residuals[1] = T(obs[1]) - Xc[1] / Xc[2] * T(fy) + T(cy);
+            residuals[0] = T(obs[0]) - (Xc[0] / Xc[2] * T(fx) + T(cx));
+            residuals[1] = T(obs[1]) - (Xc[1] / Xc[2] * T(fy) + T(cy));
 
             return true;
         }
@@ -210,8 +210,8 @@ namespace spline { // Default: Assume car front is $z$-axis
             T tmp = Xc[0] / Xc[2] * T(fx) + T(cx);
 
             residuals[0] = T(obs[0]) - tmp;
-            residuals[1] = T(obs[1]) - Xc[1] / Xc[2] * T(fy) + T(cy);
-            residuals[2] = T(obs[2]) - tmp + T(bf) / Xc[2];
+            residuals[1] = T(obs[1]) - (Xc[1] / Xc[2] * T(fy) + T(cy));
+            residuals[2] = T(obs[2]) - (tmp - T(bf) / Xc[2]);
 
             return true;
         }
@@ -235,7 +235,7 @@ namespace spline { // Default: Assume car front is $z$-axis
     struct RotConsistencyError {
         template<typename T>
         bool operator()(const T *const rotAng0, const T *const rotAng1, T *residuals) const {
-            residuals[0] = T(5e3)*(rotAng0[0] - rotAng1[0]);
+            residuals[0] = T(5e3) * (rotAng0[0] - rotAng1[0]);
             return true;
         }
 
@@ -248,7 +248,7 @@ namespace spline { // Default: Assume car front is $z$-axis
     struct RotPenalty {
         template<typename T>
         bool operator()(const T *const rotAng, T *residuals) const {
-            residuals[0] = T(5e3)*(rotAng[0]);
+            residuals[0] = T(1e2) * (rotAng[0]);
             return true;
         }
 

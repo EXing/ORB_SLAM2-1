@@ -73,7 +73,7 @@ spline::SplineBA::SplineBA(std::vector<KeyFrame *> &vpKF, const std::vector<MapP
     std::vector<double> init_rotAngle(rotAngle);// backup
 
     // Approximation
-    traj = spline::Bspline<3>(3, Q, vpKF.size() / 2, u, dQ);
+    traj = spline::Bspline<3>(3, Q, std::floor(vpKF.size() / 3), u, dQ);
 
     std::vector<double> splineInlierRate;
     optimize(vpKF, vpMP, true, splineInlierRate, bRobust);
@@ -169,8 +169,8 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
     }
 
     // SplineReprojectionError
-    const float thHuber2D = 6;
-    const float thHuber3D = 8;
+    const double thHuber2D = std::sqrt(5.99);
+    const double thHuber3D = std::sqrt(7.815);
     ceres::LossFunction *loss_function_2d = new ceres::HuberLoss(thHuber2D);
     ceres::LossFunction *loss_function_3d = new ceres::HuberLoss(thHuber3D);
     for (size_t i = 0; i < vpMP.size(); i++) {
@@ -191,6 +191,7 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
                 ceres::CostFunction *cost_function = SplineMonoReprojectionError::Create(obs, Rcb, tcb, pKF->fx,
                                                                                          pKF->fy, pKF->cx, pKF->cy,
                                                                                          ders_ptrs[pKF->mnId]);
+
 
                 if (initialization) {
                     // Remind convert CV_32F to CV_64F for double type usage
@@ -239,12 +240,12 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
         }
     }
 
-    // RotConsistencyError
+    /*// RotConsistencyError
     for (size_t i = 1; i < rotAngle.size(); i++) {
         rotConsistencyRes.push_back(
                 problem.AddResidualBlock(RotConsistencyError::Create(), nullptr, rotAngle.data() + i,
                                          rotAngle.data() + i - 1));
-    }
+    }*/
 
     for (size_t i = 0; i < rotAngle.size(); i++) {
         // RotPenalty
@@ -256,7 +257,6 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
 
         // ordering, rotAngle 2nd
         ordering->AddElementToGroup(rotAngle.data() + i, 1);
-        problem.AddParameterBlock(rotAngle.data() + i, 1);// addtional check
     }
 
     // ordering, control points 3rd
@@ -266,9 +266,6 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
 
     // Fix 1st Control point
     problem.SetParameterBlockConstant(traj.getCP()[0].data());
-
-    // Fix 1st angle
-    problem.SetParameterBlockConstant(rotAngle.data());
 
     // Scale Consistency except buffer begin(TODO: windowBA)
     // Fix the first p+1 control points
@@ -288,13 +285,13 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
     }
     residuals.clear();
 
-    evaluateOptions.residual_blocks = rotConsistencyRes;
+    /*evaluateOptions.residual_blocks = rotConsistencyRes;
     problem.Evaluate(evaluateOptions, nullptr, &residuals, nullptr, nullptr);
     double rotConsistencyErrorBefore = 0;
     for (auto &res: residuals) {
         rotConsistencyErrorBefore += res * res;
     }
-    residuals.clear();
+    residuals.clear();*/
 
     evaluateOptions.residual_blocks = rotPenaltyRes;
     problem.Evaluate(evaluateOptions, nullptr, &residuals, nullptr, nullptr);
@@ -309,7 +306,7 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
     options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
     options.minimizer_progress_to_stdout = true;
     options.num_threads = 3;
-    options.max_num_iterations = 20;
+    //options.max_num_iterations = 20;
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
 
@@ -340,13 +337,13 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
     }
     residuals.clear();
 
-    evaluateOptions.residual_blocks = rotConsistencyRes;
+    /*evaluateOptions.residual_blocks = rotConsistencyRes;
     problem.Evaluate(evaluateOptions, nullptr, &residuals, nullptr, nullptr);
     double rotConsistencyErrorAfter = 0;
     for (auto &res: residuals) {
         rotConsistencyErrorAfter += res * res;
     }
-    residuals.clear();
+    residuals.clear();*/
 
     evaluateOptions.residual_blocks = rotPenaltyRes;
     problem.Evaluate(evaluateOptions, nullptr, &residuals, nullptr, nullptr);
@@ -358,11 +355,11 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
 
     std::cout << "Error before opt:" << std::endl
               << "repError: " << repErrorBefore << std::endl
-              << "rotConsistencyError: " << rotConsistencyErrorBefore << std::endl
+              //<< "rotConsistencyError: " << rotConsistencyErrorBefore << std::endl
               << "rotPenaltyError: " << rotPenaltyErrorBefore << std::endl
               << "Error after opt:" << std::endl
               << "repError: " << repErrorAfter << std::endl
-              << "rotConsistencyError: " << rotConsistencyErrorAfter << std::endl
+              //<< "rotConsistencyError: " << rotConsistencyErrorAfter << std::endl
               << "rotPenaltyErrorError: " << rotPenaltyErrorAfter << std::endl;
 
     return 0;
