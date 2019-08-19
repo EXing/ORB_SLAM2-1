@@ -78,6 +78,19 @@ spline::SplineBA::SplineBA(std::vector<KeyFrame *> &vpKF, const std::vector<MapP
     std::vector<double> splineInlierRate;
     optimize(vpKF, vpMP, true, splineInlierRate, bRobust);
 
+    /*std::set<size_t> X;
+    for (size_t i = 0; i < splineInlierRate.size(); i++) {
+        if (splineInlierRate[i] < 0.7) {// i-th frame
+            size_t idx = traj.findSpan(u[i]);
+            X.insert(idx);
+        }
+    }
+    std::vector<double> Xv;
+    for (auto &idx: X) {
+        Xv.push_back((traj.getKnotVector()[idx] + traj.getKnotVector()[idx + 1]) / 2);
+    }
+    traj.refineKnotVect(Xv);
+    optimize(vpKF, vpMP, false, splineInlierRate, bRobust);*/
     /*// TODO: is it reasonable to run opt several times? any other choice?
     for (int counter = 0; counter < 5; counter++) {// 5 iteration at most
         if (std::accumulate(splineInlierRate.begin(), splineInlierRate.end(), 0.0) / splineInlierRate.size() < 0.5) {
@@ -127,7 +140,6 @@ spline::SplineBA::SplineBA(std::vector<KeyFrame *> &vpKF, const std::vector<MapP
             continue;
 
         pMP->mPosGBA.convertTo(pMP->mPosGBA, CV_32F);
-        //pMP->GetWorldPos().convertTo(pMP->mPosGBA, CV_32F);
     }
 }
 
@@ -313,19 +325,20 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
     // Use FullReport() to diagnose performance problems
     std::cout << summary.FullReport() << "\n";
 
-    /*// count inliers
-    splineInlierRate.clear();
-    ceres::Problem::EvaluateOptions evaluateOptions;
-    double inlierThreshold = 2 * 2; // TODO: Find a suitable inlierThreshold in sqrt pixel unit
-    for (auto &it: vpKF) {
-        if (it->isBad() || it->mnId > vpKF.back()->mnId)
-            continue;
-        evaluateOptions.residual_blocks = std::move(splineResidualBlocks[it->mnId]);
-        std::vector<double> singleFrameResiduals;
-        problem.Evaluate(evaluateOptions, nullptr, &singleFrameResiduals, nullptr, nullptr);
-        splineInlierRate.push_back(std::count_if(singleFrameResiduals.begin(), singleFrameResiduals.end(),
-                                                 [&](double &x) { return std::abs(x) < inlierThreshold; })
-                                   / double(singleFrameResiduals.size()));
+    /*if (initialization) {
+        // count inliers
+        splineInlierRate.clear();
+        double inlierThreshold = 2; // TODO: Find a suitable inlierThreshold in sqrt pixel unit
+        for (auto &it: vpKF) {
+            if (it->isBad())
+                continue;
+            evaluateOptions.residual_blocks = std::move(splineResidualBlocks[it->mnId]);
+            std::vector<double> singleFrameResiduals;
+            problem.Evaluate(evaluateOptions, nullptr, &singleFrameResiduals, nullptr, nullptr);
+            splineInlierRate.push_back(std::count_if(singleFrameResiduals.begin(), singleFrameResiduals.end(),
+                                                     [&](double &x) { return std::abs(x) < inlierThreshold; })
+                                       / double(singleFrameResiduals.size()));
+        }
     }*/
 
     /*** error after opt ***/

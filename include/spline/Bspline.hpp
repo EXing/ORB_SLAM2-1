@@ -262,7 +262,7 @@ namespace spline {
         };
 
         // assume X: ascending sorted
-        int refineKnotVect(const std::vector<double> &X) {
+        int refineKnotVect(std::vector<double> &X) {
             if (knotVector.empty()) {
                 std::cerr << "Function refineKnotVect: knotVector is empty!" << std::endl;
                 return -1;
@@ -271,6 +271,8 @@ namespace spline {
                 std::cerr << "Function refineKnotVect: controlPoints is empty!" << std::endl;
                 return -1;
             }
+
+            std::sort(X.begin(), X.end());
 
             std::vector<Eigen::Matrix<double, dim, 1>, Eigen::aligned_allocator<Eigen::Matrix<double, dim, 1>>> Q(
                     controlPoints.size() + X.size());
