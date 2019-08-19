@@ -222,6 +222,7 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
 
                 // ordering, landmarks 1st
                 ordering->AddElementToGroup(pMP->mPosGBA.ptr<double>(), 0);
+                //problem.SetParameterBlockConstant(pMP->mPosGBA.ptr<double>());
             } else { // Stereo
                 Eigen::Matrix<double, 3, 1> obs;
                 const float kp_ur = pKF->mvuRight[mit->second];
@@ -248,6 +249,7 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
 
                 // ordering, landmarks 1st
                 ordering->AddElementToGroup(pMP->mPosGBA.ptr<double>(), 0);
+                //problem.SetParameterBlockConstant(pMP->mPosGBA.ptr<double>());
             }
         }
     }

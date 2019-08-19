@@ -18,7 +18,7 @@
 
 using namespace ORB_SLAM2;
 
-namespace spline { // Default: Assume car front is $z$-axis
+namespace spline {
 
     class SplineBA {
     public:
@@ -65,12 +65,20 @@ namespace spline { // Default: Assume car front is $z$-axis
         z[0] = cost * z[0] + sint * n[0];
         z[1] = cost * z[1] + sint * n[1];
         z[2] = cost * z[2] + sint * n[2];
+        const T scale1 = T(1) / sqrt(z[0] * z[0] + z[1] * z[1] + z[2] * z[2]);
+        z[0] *= scale1;
+        z[1] *= scale1;
+        z[2] *= scale1;
         Rbw(2, 0) = z[0];
         Rbw(2, 1) = z[1];
         Rbw(2, 2) = z[2];
 
         T x[3];
         ceres::CrossProduct<T>(y, z, x);
+        const T scale2 = T(1) / sqrt(x[0] * x[0] + x[1] * x[1] + x[2] * x[2]);
+        x[0] *= scale2;
+        x[1] *= scale2;
+        x[2] *= scale2;
         Rbw(0, 0) = x[0];
         Rbw(0, 1) = x[1];
         Rbw(0, 2) = x[2];
@@ -235,7 +243,7 @@ namespace spline { // Default: Assume car front is $z$-axis
     struct RotConsistencyError {
         template<typename T>
         bool operator()(const T *const rotAng0, const T *const rotAng1, T *residuals) const {
-            residuals[0] = T(5e3) * (rotAng0[0] - rotAng1[0]);
+            residuals[0] = T(1e2) * (rotAng0[0] - rotAng1[0]);
             return true;
         }
 
