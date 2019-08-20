@@ -202,6 +202,7 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
 
                 ceres::CostFunction *cost_function = SplineMonoReprojectionError::Create(obs, Rcb, tcb, pKF->fx,
                                                                                          pKF->fy, pKF->cx, pKF->cy,
+                                                                                         pKF->mvInvLevelSigma2[kpUn.octave],
                                                                                          ders_ptrs[pKF->mnId]);
 
 
@@ -231,6 +232,7 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
                 ceres::CostFunction *cost_function = SplineStereoReprojectionError::Create(obs, Rcb, tcb, pKF->fx,
                                                                                            pKF->fy, pKF->cx, pKF->cy,
                                                                                            pKF->mbf,
+                                                                                           pKF->mvInvLevelSigma2[kpUn.octave],
                                                                                            ders_ptrs[pKF->mnId]);
 
                 if (initialization) {
@@ -263,7 +265,7 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
 
     for (size_t i = 0; i < rotAngle.size(); i++) {
         // RotPenalty
-        rotPenaltyRes.push_back(problem.AddResidualBlock(RotPenalty::Create(), nullptr, rotAngle.data() + i));
+        //rotPenaltyRes.push_back(problem.AddResidualBlock(RotPenalty::Create(), nullptr, rotAngle.data() + i));
 
         // RotAng constrain
         problem.SetParameterLowerBound(rotAngle.data() + i, 0, -M_PI / 4);
@@ -280,6 +282,9 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
 
     // Fix 1st Control point
     problem.SetParameterBlockConstant(traj.getCP()[0].data());
+
+    // 1st angle
+    problem.SetParameterBlockConstant(rotAngle.data());
 
     // Scale Consistency except buffer begin(TODO: windowBA)
     // Fix the first p+1 control points
@@ -307,20 +312,20 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
     }
     residuals.clear();*/
 
-    evaluateOptions.residual_blocks = rotPenaltyRes;
+    /*evaluateOptions.residual_blocks = rotPenaltyRes;
     problem.Evaluate(evaluateOptions, nullptr, &residuals, nullptr, nullptr);
     double rotPenaltyErrorBefore = 0;
     for (auto &res: residuals) {
         rotPenaltyErrorBefore += res * res;
     }
-    residuals.clear();
+    residuals.clear();*/
 
     /*** solve ***/
     options.linear_solver_ordering.reset(ordering);
     options.linear_solver_type = ceres::SPARSE_NORMAL_CHOLESKY;
     options.minimizer_progress_to_stdout = true;
     options.num_threads = 3;
-    //options.max_num_iterations = 20;
+    options.max_num_iterations = 10;
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
 
@@ -360,22 +365,22 @@ int spline::SplineBA::optimize(const std::vector<KeyFrame *> &vpKF, const std::v
     }
     residuals.clear();*/
 
-    evaluateOptions.residual_blocks = rotPenaltyRes;
+    /*evaluateOptions.residual_blocks = rotPenaltyRes;
     problem.Evaluate(evaluateOptions, nullptr, &residuals, nullptr, nullptr);
     double rotPenaltyErrorAfter = 0;
     for (auto &res: residuals) {
         rotPenaltyErrorAfter += res * res;
     }
-    residuals.clear();
+    residuals.clear();*/
 
     std::cout << "Error before opt:" << std::endl
               << "repError: " << repErrorBefore << std::endl
               //<< "rotConsistencyError: " << rotConsistencyErrorBefore << std::endl
-              << "rotPenaltyError: " << rotPenaltyErrorBefore << std::endl
+              //<< "rotPenaltyError: " << rotPenaltyErrorBefore << std::endl
               << "Error after opt:" << std::endl
-              << "repError: " << repErrorAfter << std::endl
+              << "repError: " << repErrorAfter << std::endl;
               //<< "rotConsistencyError: " << rotConsistencyErrorAfter << std::endl
-              << "rotPenaltyErrorError: " << rotPenaltyErrorAfter << std::endl;
+              //<< "rotPenaltyErrorError: " << rotPenaltyErrorAfter << std::endl;
 
     return 0;
 }

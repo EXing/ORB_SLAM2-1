@@ -86,9 +86,10 @@ namespace spline {
 
     struct SplineMonoReprojectionError {
         SplineMonoReprojectionError(const Eigen::Vector2d &obs, const Eigen::Matrix3d &Rcb, const Eigen::Vector3d &tcb,
-                                    double fx, double fy, double cx, double cy,
+                                    double fx, double fy, double cx, double cy, double information,
                                     Eigen::Matrix<double, 2, 4> &dersTraj)
-                : obs(obs), Rcb(Rcb), tcb(tcb), dersTraj(dersTraj), fx(fx), fy(fy), cx(cx), cy(cy) {}
+                : obs(obs), Rcb(Rcb), tcb(tcb), fx(fx), fy(fy), cx(cx), cy(cy), information(information),
+                  dersTraj(dersTraj) {}
 
         template<typename T>
         bool operator()(const T *const cp0, const T *const cp1, const T *const cp2, const T *const cp3,
@@ -138,23 +139,25 @@ namespace spline {
             Xc[1] += T(tcb(1));
             Xc[2] += T(tcb(2));
 
-            residuals[0] = T(obs[0]) - (Xc[0] / Xc[2] * T(fx) + T(cx));
-            residuals[1] = T(obs[1]) - (Xc[1] / Xc[2] * T(fy) + T(cy));
+            residuals[0] = T(information) * (T(obs[0]) - (Xc[0] / Xc[2] * T(fx) + T(cx)));
+            residuals[1] = T(information) * (T(obs[1]) - (Xc[1] / Xc[2] * T(fy) + T(cy)));
 
             return true;
         }
 
         static ceres::CostFunction *
         Create(const Eigen::Vector2d &obs, const Eigen::Matrix3d &Rcb, const Eigen::Vector3d &tcb, double fx, double fy,
-               double cx, double cy, Eigen::Matrix<double, 2, 4> &dersTraj) {
+               double cx, double cy, double information, Eigen::Matrix<double, 2, 4> &dersTraj) {
             return (new ceres::AutoDiffCostFunction<SplineMonoReprojectionError, 2, 3, 3, 3, 3, 1, 3>(
-                    new SplineMonoReprojectionError(obs, Rcb, tcb, fx, fy, cx, cy, dersTraj)));
+                    new SplineMonoReprojectionError(obs, Rcb, tcb, fx, fy, cx, cy, information, dersTraj)));
         }
 
         Eigen::Vector2d obs;
         Eigen::Matrix3d Rcb;
         Eigen::Vector3d tcb;
         double fx, fy, cx, cy;
+
+        double information;
 
         // for spline evaluation
         Eigen::Matrix<double, 2, 4> dersTraj;
@@ -163,9 +166,10 @@ namespace spline {
     struct SplineStereoReprojectionError {
         SplineStereoReprojectionError(const Eigen::Vector3d &obs, const Eigen::Matrix3d &Rcb,
                                       const Eigen::Vector3d &tcb,
-                                      double fx, double fy, double cx, double cy, double bf,
+                                      double fx, double fy, double cx, double cy, double bf, double information,
                                       Eigen::Matrix<double, 2, 4> &dersTraj)
-                : obs(obs), Rcb(Rcb), tcb(tcb), dersTraj(dersTraj), fx(fx), fy(fy), cx(cx), cy(cy), bf(bf) {}
+                : obs(obs), Rcb(Rcb), tcb(tcb), fx(fx), fy(fy), cx(cx), cy(cy), bf(bf), information(information),
+                  dersTraj(dersTraj) {}
 
         template<typename T>
         bool operator()(const T *const cp0, const T *const cp1, const T *const cp2, const T *const cp3,
@@ -217,24 +221,26 @@ namespace spline {
 
             T tmp = Xc[0] / Xc[2] * T(fx) + T(cx);
 
-            residuals[0] = T(obs[0]) - tmp;
-            residuals[1] = T(obs[1]) - (Xc[1] / Xc[2] * T(fy) + T(cy));
-            residuals[2] = T(obs[2]) - (tmp - T(bf) / Xc[2]);
+            residuals[0] = T(information) * (T(obs[0]) - tmp);
+            residuals[1] = T(information) * (T(obs[1]) - (Xc[1] / Xc[2] * T(fy) + T(cy)));
+            residuals[2] = T(information) * (T(obs[2]) - (tmp - T(bf) / Xc[2]));
 
             return true;
         }
 
         static ceres::CostFunction *
         Create(const Eigen::Vector3d &obs, const Eigen::Matrix3d &Rcb, const Eigen::Vector3d &tcb, double fx, double fy,
-               double cx, double cy, double bf, Eigen::Matrix<double, 2, 4> &dersTraj) {
+               double cx, double cy, double bf, double information, Eigen::Matrix<double, 2, 4> &dersTraj) {
             return (new ceres::AutoDiffCostFunction<SplineStereoReprojectionError, 3, 3, 3, 3, 3, 1, 3>(
-                    new SplineStereoReprojectionError(obs, Rcb, tcb, fx, fy, cx, cy, bf, dersTraj)));
+                    new SplineStereoReprojectionError(obs, Rcb, tcb, fx, fy, cx, cy, bf, information, dersTraj)));
         }
 
         Eigen::Vector3d obs;
         Eigen::Matrix3d Rcb;
         Eigen::Vector3d tcb;
         double fx, fy, cx, cy, bf;
+
+        double information;
 
         // for spline evaluation
         Eigen::Matrix<double, 2, 4> dersTraj;
